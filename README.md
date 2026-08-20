@@ -141,11 +141,15 @@ con el bot corriendo en modo `dev` (`tsx watch`), los cambios se aplican solos.
    `WHATSAPP_APP_SECRET` — no lo desactives ni lo dejes sin `App Secret`
    configurado en producción, o cualquiera podría inyectar mensajes falsos.
 
+## Deploy
+
+Ver [`DEPLOY.md`](./DEPLOY.md) para llevar `bot` y `panel` a Railway con
+Postgres y Redis administrados — necesario para tener la URL pública que
+pide el webhook de WhatsApp Cloud API.
+
 ## Mejoras pendientes (fuera de scope v1)
 
 - Soporte de mensajes de imagen y sticker (hoy se ignoran; audio ya se
   transcribe).
 - Manejo de mensajes de grupos (hoy se ignoran).
 - WebSockets en vez de polling para el panel.
-- Deploy a un servidor en la nube (el proyecto está pensado para que esto sea
-  fácil después, gracias a la separación en servicios).
