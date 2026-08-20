@@ -1,0 +1,57 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: botuser
+      POSTGRES_PASSWORD: botpass
+      POSTGRES_DB: whatsapp_bot
+    ports:
+      - "5432:5432"        # solo para inspeccionar en local; NO exponer en prod
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U botuser -d whatsapp_bot"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"        # solo local
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  bot:
+    build: ./bot
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://botuser:botpass@postgres:5432/whatsapp_bot
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    volumes:
+      - ./bot:/app
+      - /app/node_modules          # ver "gotcha node_modules" en README
+      - ./informacion-barberia:/app/informacion-barberia:ro
+
+  panel:
+    build: ./panel
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://botuser:botpass@postgres:5432/whatsapp_bot
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      postgres: { condition: service_healthy }
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./panel:/app
+      - /app/node_modules
+
+volumes:
+  pgdata:

@@ -1,0 +1,10 @@
+.env
+data/
+backups/
+node_modules/
+auth/
+*.log
+.DS_Store
+.next/
+tsconfig.tsbuildinfo
+dist/
