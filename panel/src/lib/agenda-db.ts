@@ -42,6 +42,7 @@ export interface Turno {
   cliente_nombre: string;
   cliente_whatsapp: string;
   estado: TurnoEstado;
+  es_fijo?: boolean;
 }
 
 export { generateSlots };
@@ -96,17 +97,50 @@ export async function deleteHorarioFijo(id: string): Promise<void> {
 }
 
 export async function listTurnos(fechaIso: string): Promise<Turno[]> {
-  const res = await pool.query<Turno>(
-    `SELECT t.id, p.nombre AS peluquero_nombre, s.nombre AS servicio_nombre,
-            t.fecha, t.hora, t.cliente_nombre, t.cliente_whatsapp, t.estado
-     FROM turnos t
-     JOIN peluqueros p ON p.id = t.peluquero_id
-     JOIN servicios s ON s.id = t.servicio_id
-     WHERE t.fecha = $1
-     ORDER BY p.nombre, t.hora`,
-    [fechaIso],
-  );
-  return res.rows;
+  const dow = dowFromFechaIso(fechaIso);
+
+  const [turnosRes, fijosRes] = await Promise.all([
+    pool.query<Turno>(
+      `SELECT t.id, p.nombre AS peluquero_nombre, s.nombre AS servicio_nombre,
+              t.fecha, t.hora, t.cliente_nombre, t.cliente_whatsapp, t.estado
+       FROM turnos t
+       JOIN peluqueros p ON p.id = t.peluquero_id
+       JOIN servicios s ON s.id = t.servicio_id
+       WHERE t.fecha = $1`,
+      [fechaIso],
+    ),
+    pool.query<{
+      id: string;
+      peluquero_nombre: string;
+      hora: string;
+      cliente_nombre: string | null;
+    }>(
+      `SELECT hf.id, p.nombre AS peluquero_nombre, hf.hora, hf.cliente_nombre
+       FROM horarios_fijos hf
+       JOIN peluqueros p ON p.id = hf.peluquero_id
+       WHERE hf.dia_semana = $1 AND hf.activo = true`,
+      [dow],
+    ),
+  ]);
+
+  const fijosComoTurnos: Turno[] = fijosRes.rows.map((f) => ({
+    id: `fijo:${f.id}`,
+    peluquero_nombre: f.peluquero_nombre,
+    servicio_nombre: "Turno fijo",
+    fecha: fechaIso,
+    hora: f.hora,
+    cliente_nombre: f.cliente_nombre || "Turno fijo",
+    cliente_whatsapp: "",
+    estado: "confirmado",
+    es_fijo: true,
+  }));
+
+  return [...turnosRes.rows, ...fijosComoTurnos].sort((a, b) => {
+    if (a.peluquero_nombre !== b.peluquero_nombre) {
+      return a.peluquero_nombre.localeCompare(b.peluquero_nombre);
+    }
+    return a.hora.localeCompare(b.hora);
+  });
 }
 
 export async function setTurnoEstado(

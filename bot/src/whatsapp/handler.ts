@@ -16,6 +16,21 @@ import type { InboxItem } from "../redis.js";
 
 const NOTIFY_WHATSAPP_JID = process.env.NOTIFY_WHATSAPP_JID;
 
+// Para que no se sienta como una respuesta robótica instantánea. No se usa
+// `await` para esperarla: así el bot sigue procesando otros mensajes de la
+// cola mientras esta respuesta espera su turno para salir.
+const REPLY_DELAY_MS = Number(process.env.BOT_REPLY_DELAY_MS) || 20_000;
+
+function sendTextDelayed(phone: string, reply: string): void {
+  setTimeout(() => {
+    sendText(phone, reply)
+      .then(() => console.log(`[bot] → enviado a ${phone}`))
+      .catch((err) =>
+        console.error(`[bot] error enviando respuesta demorada a ${phone}:`, err),
+      );
+  }, REPLY_DELAY_MS);
+}
+
 export async function handleInboxMessage(msg: InboxItem): Promise<void> {
   const phone = msg.from;
   let text = msg.type === "text" ? msg.text?.body : undefined;
@@ -34,7 +49,7 @@ export async function handleInboxMessage(msg: InboxItem): Promise<void> {
     }
 
     if (!text) {
-      await sendText(
+      sendTextDelayed(
         phone,
         "No pude entender el audio 🙏 ¿Me lo escribís por texto así te ayudo?",
       );
@@ -73,8 +88,7 @@ export async function handleInboxMessage(msg: InboxItem): Promise<void> {
 
   if (reply) {
     await insertMessage(convo.id, "assistant", reply);
-    await sendText(phone, reply);
-    console.log(`[bot] → enviado a ${phone}`);
+    sendTextDelayed(phone, reply);
   }
 
   if (notify) {

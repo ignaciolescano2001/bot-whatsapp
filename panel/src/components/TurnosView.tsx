@@ -295,22 +295,35 @@ export default function TurnosView() {
                 {t.hora.slice(0, 5)} · {t.peluquero_nombre} · {t.servicio_nombre}
               </p>
               <p className="text-sm text-neutral-500">
-                {t.cliente_nombre} · {t.cliente_whatsapp}
+                {t.cliente_nombre}
+                {t.cliente_whatsapp ? ` · ${t.cliente_whatsapp}` : ""}
               </p>
             </div>
             <div className="flex items-center gap-2">
-              <span
-                className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${ESTADO_STYLES[t.estado]}`}
-              >
-                {t.estado}
-              </span>
-              {(t.estado === "confirmado" || t.estado === "pendiente") && (
-                <button
-                  onClick={() => cancelar(t)}
-                  className="rounded-md border border-red-900 px-2 py-1 text-xs text-red-400 hover:bg-red-950"
+              {t.es_fijo ? (
+                <Link
+                  href="/horarios-fijos"
+                  className="shrink-0 rounded-full bg-sky-950 px-2 py-0.5 text-xs font-medium text-sky-400 hover:bg-sky-900"
+                  title="Se gestiona en Horarios fijos"
                 >
-                  Cancelar
-                </button>
+                  fijo
+                </Link>
+              ) : (
+                <>
+                  <span
+                    className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${ESTADO_STYLES[t.estado]}`}
+                  >
+                    {t.estado}
+                  </span>
+                  {(t.estado === "confirmado" || t.estado === "pendiente") && (
+                    <button
+                      onClick={() => cancelar(t)}
+                      className="rounded-md border border-red-900 px-2 py-1 text-xs text-red-400 hover:bg-red-950"
+                    >
+                      Cancelar
+                    </button>
+                  )}
+                </>
               )}
             </div>
           </div>
