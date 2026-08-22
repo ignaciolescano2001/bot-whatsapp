@@ -1,0 +1,11 @@
+{
+  "scripts": {
+    "dev": "node --watch --env-file=.env server.js",
+    "start": "node --env-file=.env server.js",
+    "dev:all": "./scripts/dev-twilio.sh"
+  },
+  "dependencies": {
+    "express": "^5.2.1",
+    "ioredis": "^6.0.0"
+  }
+}

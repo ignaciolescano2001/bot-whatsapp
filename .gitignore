@@ -8,3 +8,5 @@ auth/
 .next/
 tsconfig.tsbuildinfo
 dist/
+.dev-logs/
+bot/informacion-barberia

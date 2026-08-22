@@ -1,5 +1,5 @@
 import { initSchema } from "./db.js";
-import { sendText } from "./cloudapi/client.js";
+import { sendText } from "./twilio/client.js";
 import { handleInboxMessage } from "./whatsapp/handler.js";
 import {
   requeueOutboxItem,

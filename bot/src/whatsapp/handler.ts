@@ -11,7 +11,7 @@ import {
   downloadMedia,
   sendText,
   sendOwnerNotification,
-} from "../cloudapi/client.js";
+} from "../twilio/client.js";
 import type { InboxItem } from "../redis.js";
 
 const NOTIFY_WHATSAPP_JID = process.env.NOTIFY_WHATSAPP_JID;
