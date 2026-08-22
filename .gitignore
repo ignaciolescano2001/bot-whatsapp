@@ -10,3 +10,4 @@ tsconfig.tsbuildinfo
 dist/
 .dev-logs/
 bot/informacion-barberia
+panel/.env.local

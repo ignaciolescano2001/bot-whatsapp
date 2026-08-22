@@ -2,13 +2,13 @@
 #
 # Levanta todo el flujo de prueba de Twilio WhatsApp Sandbox con un solo
 # comando: Postgres + Redis (Docker), el proceso bot/ (OpenAI + Supabase),
-# el gateway Express (server.js) y un túnel de ngrok.
+# el gateway Express (server.js), el panel (Next.js) y un túnel de ngrok.
 #
 # Uso:
 #   ./scripts/dev-twilio.sh
 #
-# Ctrl+C detiene bot/, el gateway y ngrok. Postgres/Redis quedan corriendo
-# en Docker (para pararlos: docker compose stop postgres redis).
+# Ctrl+C detiene bot/, el gateway, el panel y ngrok. Postgres/Redis quedan
+# corriendo en Docker (para pararlos: docker compose stop postgres redis).
 #
 # Requiere: docker, node, y ngrok ya autenticado (ngrok config add-authtoken).
 #
@@ -56,6 +56,11 @@ echo "==> Levantando el gateway Twilio (server.js) en :3000..."
   > "$LOG_DIR/server.log" 2>&1 &
 PIDS+=("$!")
 
+echo "==> Levantando el panel (dashboard) en :3001..."
+(cd "$REPO_ROOT/panel" && exec ./node_modules/.bin/next dev -H 0.0.0.0 -p 3001) \
+  > "$LOG_DIR/panel.log" 2>&1 &
+PIDS+=("$!")
+
 echo "==> Levantando ngrok..."
 (exec ngrok http 3000 --log=stdout) > "$LOG_DIR/ngrok.log" 2>&1 &
 PIDS+=("$!")
@@ -78,11 +83,12 @@ if [ -n "$NGROK_URL" ]; then
 else
   echo "No se pudo obtener la URL de ngrok, revisá $LOG_DIR/ngrok.log"
 fi
+echo "Panel (dashboard): http://localhost:3001"
 echo "================================================================"
 echo "Logs en vivo (Ctrl+C para detener todo):"
 echo
 
-tail -f "$LOG_DIR/bot.log" "$LOG_DIR/server.log" "$LOG_DIR/ngrok.log" &
+tail -f "$LOG_DIR/bot.log" "$LOG_DIR/server.log" "$LOG_DIR/panel.log" "$LOG_DIR/ngrok.log" &
 PIDS+=("$!")
 
 wait
