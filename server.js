@@ -1,6 +1,7 @@
 const crypto = require("crypto");
 const express = require("express");
 const { enqueueInbox } = require("./lib/redis");
+const { markWebhookReceived } = require("./lib/db");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -37,6 +38,12 @@ app.post("/webhook/whatsapp", async (req, res) => {
     });
   } catch (err) {
     console.error("[webhook] error encolando el mensaje:", err.message);
+  }
+
+  try {
+    await markWebhookReceived(toPlainPhone(to));
+  } catch (err) {
+    console.error("[webhook] error actualizando connection_state:", err.message);
   }
 });
 
