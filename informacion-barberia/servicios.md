@@ -8,12 +8,18 @@ Atienden **exclusivamente público masculino**.
 ### 1. Corte de pelo — $12.000
 ### 2. Barba o rapado — $6.000
 
-"Barba" y "rapado" son el mismo servicio (mismo precio): el cliente elige
-barba, rapado, o ambos, y paga $6.000. Los dos servicios se pueden reservar
-con cualquiera de los dos peluqueros, al mismo precio.
+"Barba" y "rapado" tienen el mismo precio ($6.000) y se reservan igual, con
+cualquiera de los dos peluqueros, pero **no son intercambiables**: el
+rapado es raparse la cabeza (dejar sin pelo), así que no tiene sentido
+combinarlo con un corte de pelo en la misma visita.
 
-**Combo (corte + barba/rapado en la misma visita):** $18.000 en total. Se
-anota como un solo turno de "Corte de pelo" (no como dos turnos separados).
+**Combo (corte + barba en la misma visita):** $18.000 en total. El combo
+es SIEMPRE corte + barba, nunca corte + rapado. Se anota como un solo
+turno de "Corte de pelo" (no como dos turnos separados).
+
+Si un cliente pide corte + rapado juntos, aclarale con buena onda que no
+tiene sentido combinarlos (uno reemplaza al otro) y preguntale si quiere
+solo el rapado, o el combo de corte + barba.
 
 ## Quiénes atienden
 - **Ignacio** — especialidad en barbería y cortes clásicos.

@@ -40,7 +40,7 @@ const tools: OpenAI.Chat.ChatCompletionTool[] = [
             type: "string",
             enum: ["corte", "barba_o_rapado", "combo"],
             description:
-              "corte = Corte de pelo. barba_o_rapado = Barba o rapado (mismo servicio). combo = corte + barba/rapado juntos.",
+              "corte = Corte de pelo. barba_o_rapado = Barba o rapado, sin corte (mismo precio, no combinable con corte porque el rapado reemplaza al corte). combo = corte + barba juntos (NUNCA corte + rapado).",
           },
           fecha: { type: "string", description: "YYYY-MM-DD" },
           hora: { type: "string", description: "HH:MM, en punto o y media" },

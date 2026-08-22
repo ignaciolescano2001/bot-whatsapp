@@ -158,8 +158,10 @@ export async function crearTurno(input: CrearTurnoInput): Promise<CrearTurnoResu
     servicioLabel = "Barba o rapado";
     precio = barbaORapado.precio;
   } else {
+    // "combo" es siempre corte + barba, nunca corte + rapado (rapar
+    // reemplaza al corte, no tiene sentido combinarlos).
     servicioId = corte.id;
-    servicioLabel = "Corte de pelo + Barba o rapado";
+    servicioLabel = "Corte de pelo + Barba";
     precio = corte.precio + barbaORapado.precio;
   }
 
