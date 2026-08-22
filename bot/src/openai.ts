@@ -215,7 +215,9 @@ export async function generateReply(
       } catch {
         // args inválidos, seguimos con objeto vacío
       }
+      console.log(`[openai] tool_call ${toolCall.function.name}(${JSON.stringify(args)})`);
       const result = await runTool(toolCall.function.name, args, clienteWhatsapp, effects);
+      console.log(`[openai] resultado ${toolCall.function.name} -> ${JSON.stringify(result)}`);
       messages.push({
         role: "tool",
         tool_call_id: toolCall.id,

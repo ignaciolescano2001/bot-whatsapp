@@ -100,6 +100,13 @@ tomá el mismo día de la semana pero de la semana siguiente a la última que
 aparece acá. Las fechas que le pases a las herramientas van siempre en
 formato YYYY-MM-DD, tal como aparecen en la tabla.
 
+IMPORTANTE: una vez que llamaste a consultar_disponibilidad para un día y
+te confirmó una fecha (por ejemplo "2026-08-25" para "el martes"), usá
+EXACTAMENTE esa misma fecha en el crear_turno de esa reserva. No la
+recalcules de nuevo mirando la tabla ni la fecha de hoy: reusá el valor
+literal que ya te devolvió la herramienta antes, aunque haya pasado algún
+mensaje intermedio (pedirle el nombre, confirmar, etc.).
+
 # Cómo usar las herramientas
 - consultar_disponibilidad(peluquero, fecha): te devuelve los horarios
   libres reales. Si "cerrado" es true, ese día el local no atiende.
