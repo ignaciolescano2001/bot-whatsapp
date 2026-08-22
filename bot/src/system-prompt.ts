@@ -35,7 +35,34 @@ function fechaHoyArgentina(): string {
   return fmt.format(new Date());
 }
 
-const CORE_PROMPT = `
+// Calcular a mano qué fecha ISO corresponde a "el martes" o "mañana" es algo
+// en lo que el modelo se equivoca seguido. Le damos la tabla ya resuelta
+// para que solo tenga que buscar, no calcular.
+function proximosDiasArgentina(cantidad = 9): string {
+  const hoyIso = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Argentina/Cordoba",
+  }).format(new Date());
+  const [y, m, d] = hoyIso.split("-").map(Number);
+  const base = new Date(Date.UTC(y, m - 1, d));
+
+  const weekdayFmt = new Intl.DateTimeFormat("es-AR", {
+    weekday: "long",
+    timeZone: "UTC",
+  });
+
+  const lines: string[] = [];
+  for (let i = 0; i < cantidad; i++) {
+    const date = new Date(base.getTime() + i * 86_400_000);
+    const iso = date.toISOString().slice(0, 10);
+    const weekday = weekdayFmt.format(date);
+    const etiqueta = i === 0 ? " (hoy)" : i === 1 ? " (mañana)" : "";
+    lines.push(`- ${weekday} ${iso}${etiqueta}`);
+  }
+  return lines.join("\n");
+}
+
+function getCorePrompt(): string {
+  return `
 Sos el asistente de WhatsApp de Barbería Don Isidoro, en Capilla del Monte,
 Córdoba. Atendé a los clientes como lo haría alguien del local: relajado,
 amigable y directo, de vos, con mensajes cortos (2 a 4 líneas). La mayoría de
@@ -60,9 +87,18 @@ acartonado tipo "Estimado cliente".
    (ver más abajo) y ofrecele consultar otro horario.
 
 # Fecha y hora actual
-Hoy es ${fechaHoyArgentina()} (hora de Argentina). Usá esto para calcular
-fechas cuando el cliente diga "hoy", "mañana", "el viernes que viene", etc.
-Las fechas que le pases a las herramientas van siempre en formato YYYY-MM-DD.
+Hoy es ${fechaHoyArgentina()} (hora de Argentina).
+
+Nunca calcules a mano qué fecha ISO corresponde a "hoy", "mañana", "el
+martes", "el viernes que viene", etc. — buscá el día en esta tabla (ya
+calculada, es la fuente de verdad) y usá la fecha que está al lado:
+
+${proximosDiasArgentina()}
+
+Si el cliente pide un día que no está en esta tabla (más de una semana),
+tomá el mismo día de la semana pero de la semana siguiente a la última que
+aparece acá. Las fechas que le pases a las herramientas van siempre en
+formato YYYY-MM-DD, tal como aparecen en la tabla.
 
 # Cómo usar las herramientas
 - consultar_disponibilidad(peluquero, fecha): te devuelve los horarios
@@ -152,9 +188,10 @@ Vos: [consultás disponibilidad real] por la tarde tengo viernes 18:30 o 19:30
 Cliente: 18.30 del viernes
 Vos: [llamás a crear_turno] dale dale, quedó reservado
 `.trim();
+}
 
 export function getSystemPrompt(): string {
-  return `${CORE_PROMPT}
+  return `${getCorePrompt()}
 
 # Información del negocio (fuente única y confiable)
 
