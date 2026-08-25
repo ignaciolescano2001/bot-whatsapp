@@ -2,7 +2,7 @@
 data/
 backups/
 node_modules/
-auth/
+/bot/auth/
 *.log
 .DS_Store
 .next/
