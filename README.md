@@ -1,123 +1,123 @@
-# Agente de WhatsApp (local)
+# Agente de WhatsApp — Barbería Don Isidoro
 
-Agente de atención al cliente por WhatsApp que corre 100% en tu máquina vía
-Docker. Se conecta a un número real de WhatsApp con la **WhatsApp Cloud API**
-de Meta (API oficial, no WhatsApp Web ni Twilio) y responde con OpenAI.
-Incluye un panel web local para ver conversaciones, intervenir a mano y
-togglear cada chat entre modo **IA** y modo **Humano**.
+Bot de atención y reserva de turnos por WhatsApp para una barbería, con un
+panel web de administración. El bot responde con OpenAI, conoce el negocio
+por los archivos en `informacion-barberia/`, y puede consultar y reservar
+turnos reales contra la agenda (con horarios fijos, excepciones puntuales y
+disponibilidad por peluquero). El panel deja ver conversaciones, intervenir a
+mano, y gestionar la agenda (turnos, horarios fijos y excepciones).
 
 ## Arquitectura
 
-Cuatro servicios en contenedores separados, orquestados con `docker-compose`:
-
-- **postgres** — única fuente de verdad: conversaciones, mensajes y último
-  estado conocido de la conexión con Meta.
-- **redis** — solo se usa como cola de mensajes (`inbox`/`outbox`). El panel
-  encola ahí los mensajes entrantes que le llegan por webhook de Meta y los
-  salientes que un humano escribe desde el composer; el bot los saca y
-  responde.
-- **bot** — proceso Node que consume las colas de Redis, llama al LLM y
-  contesta por la Cloud API. Es el servicio crítico: si el panel se cae, el
-  bot sigue respondiendo.
-- **panel** — dashboard Next.js en `localhost:3000`. Recibe el webhook de
-  Meta (`/api/whatsapp/webhook`), lo encola en Redis, y lee de Postgres con
-  polling cada 2 segundos (sin WebSockets).
+- **postgres** — conversaciones y mensajes del bot (`DATABASE_URL`).
+- **Supabase (Postgres)** — la agenda del negocio: `turnos`, `horarios_fijos`,
+  `peluqueros`, `servicios` y `excepciones_agenda` (`SUPABASE_DATABASE_URL`).
+  Es una base aparte, sin herramienta de migraciones; el esquema de
+  `excepciones_agenda` está documentado en [`db/excepciones_agenda.sql`](./db/excepciones_agenda.sql).
+- **redis** — cola de mensajes (`inbox`/`outbox`) entre el gateway de Twilio,
+  el bot y el panel.
+- **server.js** — gateway Express que recibe el webhook de **Twilio WhatsApp
+  Sandbox** (`/webhook/whatsapp`), responde `200` al instante (Twilio tiene
+  timeout corto) y encola el mensaje en Redis.
+- **bot/** — proceso Node/TypeScript que consume la cola, arma el contexto
+  (system prompt + info de la barbería + herramientas de agenda), llama a
+  OpenAI y contesta por Twilio. Es el servicio crítico: si el panel se cae,
+  el bot sigue respondiendo.
+- **panel/** — dashboard Next.js. Muestra conversaciones (con toggle IA /
+  Humano por chat), y las vistas de agenda: turnos del día, agenda semanal,
+  horarios fijos y excepciones (cierres, ausencias, horarios especiales).
+  Login por contraseña única.
 
 ## Requisitos
 
-- WSL2 + Docker instalados y corriendo.
-- El proyecto tiene que vivir en el filesystem de WSL (`~/...`), **no** en
-  `/mnt/c/...`, o el hot reload dentro de los contenedores no funciona.
-- Una cuenta de OpenAI con **facturación activa** (sin eso, la API devuelve
-  401/429 aunque la key sea válida). El costo con `gpt-4o-mini` es de
-  centavos de dólar por mes en uso normal.
-- Una app de Meta con el producto **WhatsApp** configurado
-  (developers.facebook.com), con:
-  - Un número de teléfono verificado (`WHATSAPP_PHONE_NUMBER_ID`).
-  - Un token de acceso permanente (`WHATSAPP_CLOUD_API_TOKEN`) — el token
-    temporal de prueba de Meta expira cada 24hs, no sirve para dejar el bot
-    corriendo.
-  - El **App Secret** de la app (`WHATSAPP_APP_SECRET`), para validar la
-    firma de cada webhook.
-  - Una URL pública que apunte a `/api/whatsapp/webhook` del panel (Meta
-    necesita poder pegarle desde internet — en local hace falta un túnel
-    tipo `ngrok` o similar mientras development).
+- Node.js y Docker (para Postgres y Redis en local).
+- Una cuenta de OpenAI con **facturación activa** (`OPENAI_API_KEY`).
+- Un proyecto de **Supabase** con las tablas de agenda ya creadas
+  (`turnos`, `horarios_fijos`, `peluqueros`, `servicios`,
+  `excepciones_agenda`).
+- Una cuenta de **Twilio** con el WhatsApp Sandbox activado
+  (`TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_WHATSAPP_NUMBER`) — ver
+  console.twilio.com → Messaging → Try it out → WhatsApp.
+- Para desarrollo local, un túnel público hacia el gateway (`ngrok` o
+  similar) — Twilio necesita poder pegarle al webhook desde internet.
+- `ngrok` instalado y autenticado si usás `scripts/dev-twilio.sh` (ver
+  Arranque más abajo).
 
-## Arranque
+## Arranque rápido
 
-1. Copiá `.env.example` a `.env` y completá `OPENAI_API_KEY`, las variables
-   `WHATSAPP_*` con los datos de tu app de Meta, y `PANEL_PASSWORD` /
+1. Copiá `.env.example` a `.env` y completá `OPENAI_API_KEY`,
+   `SUPABASE_DATABASE_URL`, las variables `TWILIO_*`, y `PANEL_PASSWORD` /
    `PANEL_SESSION_SECRET` (esta última generala con `openssl rand -hex 32`):
    ```bash
    cp .env.example .env
    ```
 
-2. Levantá la base y la cola primero, y esperá a que estén healthy:
+2. Con Docker corriendo, un solo comando levanta todo el flujo de
+   prueba (Postgres, Redis, `bot/`, el gateway Twilio y el panel) y un túnel
+   de ngrok:
    ```bash
-   docker compose up -d postgres redis
-   docker compose ps   # esperar "healthy" en ambos
+   ./scripts/dev-twilio.sh
    ```
+   Al final imprime la URL pública que hay que pegar en Twilio (**Sandbox
+   Configuration → When a message comes in**, método `POST`) y la URL del
+   panel (`http://localhost:3001`). `Ctrl+C` detiene todo salvo
+   Postgres/Redis (`docker compose stop postgres redis` para pararlos
+   también).
 
-3. Levantá el bot y el panel:
-   ```bash
-   docker compose up bot
-   ```
-   En otra terminal:
-   ```bash
-   docker compose up panel
-   ```
-   Abrí `http://localhost:3000`. Mientras el token no sea válido o todavía
-   no llegó ningún webhook, vas a ver una pantalla de estado en vez del
-   dashboard.
+3. Sumá tu número al sandbox de Twilio (mandándole el código `join <palabra>`
+   por WhatsApp al número del sandbox) y escribile al bot.
 
-4. En el panel de Meta for Developers, configurá el webhook apuntando a
-   `https://<tu-url-pública>/api/whatsapp/webhook`, con el mismo
-   `WHATSAPP_WEBHOOK_VERIFY_TOKEN` que pusiste en `.env`, y suscribite al
-   campo `messages`. Meta hace un `GET` de verificación una sola vez al
-   guardar la URL.
-
-5. Mandale un mensaje de WhatsApp al número conectado. Cuando llega el
-   primer webhook, el panel pasa solo al dashboard, sin recargar.
+Alternativa manual, servicio por servicio: `docker compose up -d postgres
+redis`, luego `npm run dev` en `bot/`, `node --watch --env-file=.env
+server.js` en la raíz, y `npm run dev` en `panel/`.
 
 ## Personalizar el bot
 
-El "cerebro" del bot es `bot/src/system-prompt.ts`. Ahí se define la
-personalidad y las reglas de respuesta. Editalo para adaptarlo a tu negocio —
-con el bot corriendo en modo `dev` (`tsx watch`), los cambios se aplican solos.
+- **Personalidad y reglas de respuesta:** `bot/src/system-prompt.ts`.
+- **Info del negocio** (horarios, servicios y precios, preguntas frecuentes,
+  datos de contacto) que el bot usa como contexto: los `.md` en
+  `informacion-barberia/`.
+- Con el bot corriendo en modo dev (`tsx watch`), los cambios se aplican
+  solos.
 
 ## Uso del panel
 
-- Lista de conversaciones a la izquierda (más reciente arriba), con badge
-  **IA** (verde) o **HUMANO** (ámbar) y hora relativa del último mensaje.
-- Panel de conversación a la derecha, con burbujas: mensajes del cliente a la
-  izquierda, respuestas del bot o de un humano a la derecha.
-- Toggle **Modo: IA / Modo: Humano** por conversación. En modo IA el input
-  queda deshabilitado (responde el bot). En modo Humano se habilita el
-  composer: lo que escribís se guarda al instante y se encola para que el bot
-  lo mande por WhatsApp.
-- Botón **Borrar** con confirmación (borra la conversación y todos sus
-  mensajes).
+- **Conversaciones:** lista a la izquierda con badge **IA** / **HUMANO** por
+  chat; toggle para pasar el control a un humano (habilita el composer,
+  encola la respuesta para que el bot la mande por WhatsApp).
+- **Turnos:** vista del día y agenda semanal por peluquero, con detalle y
+  alta manual de turnos.
+- **Horarios fijos:** franjas habituales de atención por día.
+- **Excepciones:** cierres puntuales (feriados), ausencias de un peluquero, u
+  horarios especiales para una fecha concreta — el bot las respeta al
+  consultar disponibilidad.
+
+## Tests
+
+Cada lado (`bot/` y `panel/`) tiene un script standalone que ejercita las
+funciones puras de resolución de excepciones y generación de slots, sin
+tocar la base real:
+
+```bash
+cd bot && npm run test:excepciones
+cd panel && npm run test:excepciones
+```
 
 ## Troubleshooting
 
-- **"El token de la Cloud API no es válido o no está configurado":**
-  revisá `WHATSAPP_CLOUD_API_TOKEN` y `WHATSAPP_PHONE_NUMBER_ID` en `.env`.
-  Si usaste el token temporal de prueba de Meta, tené en cuenta que expira
-  cada 24hs — generá uno permanente desde la app de Meta.
-- **"Token válido, esperando el primer mensaje":** todavía no llegó ningún
-  webhook. Confirmá que la URL configurada en Meta apunta a
-  `/api/whatsapp/webhook`, que es accesible públicamente (revisá el túnel
-  si estás en local), y que la app está suscripta al campo `messages`.
-- **Error 401 "Invalid signature" en el webhook:** el `WHATSAPP_APP_SECRET`
-  en `.env` no coincide con el de la app de Meta.
-- **Error de OpenAI 401 o 429:** revisá que `OPENAI_API_KEY` esté bien seteada
-  en `.env` y que la cuenta de OpenAI tenga facturación activa.
-- **El panel no levanta o no recarga en caliente:** confirmá que el proyecto
-  vive en el filesystem de WSL (no en `/mnt/c/...`) y que el volumen anónimo
-  `/app/node_modules` sigue presente en `docker-compose.yml` para los
-  servicios `bot` y `panel`. Sin ese volumen, el bind mount tapa el
-  `node_modules` instalado dentro de la imagen y el contenedor arranca sin
-  dependencias.
+- **El bot no contesta:** revisá los logs de `bot/` — confirmá que
+  `TWILIO_ACCOUNT_SID`/`TWILIO_AUTH_TOKEN`/`TWILIO_WHATSAPP_NUMBER` están
+  bien seteadas y que Redis está healthy (`docker compose ps`).
+- **Twilio no llega al webhook:** confirmá que la URL del sandbox apunta a
+  `<tu-túnel>/webhook/whatsapp` (método `POST`) y que el túnel sigue activo.
+- **Error de OpenAI 401 o 429:** revisá `OPENAI_API_KEY` y que la cuenta
+  tenga facturación activa.
+- **El bot no ve la agenda / turnos:** revisá `SUPABASE_DATABASE_URL` y que
+  las tablas de agenda existan en ese proyecto de Supabase.
+- **El panel no levanta o no recarga en caliente (vía Docker):** confirmá que
+  el proyecto vive en el filesystem de WSL (no en `/mnt/c/...`) y que el
+  volumen anónimo `/app/node_modules` sigue presente en
+  `docker-compose.yml` para los servicios `bot` y `panel`.
 
 ## ⚠️ Seguridad — bloqueante para producción
 
@@ -131,25 +131,28 @@ con el bot corriendo en modo `dev` (`tsx watch`), los cambios se aplican solos.
    admin, el dueño del negocio). Se configura con `PANEL_PASSWORD` y
    `PANEL_SESSION_SECRET` en `.env` — sin esas dos variables el panel no deja
    entrar a nadie. El middleware (`panel/src/middleware.ts`) protege todas
-   las rutas salvo `/login`, `/api/auth/login` y el webhook de Meta (que se
-   valida con su propia firma, no con esta sesión). La sesión es una cookie
+   las rutas salvo `/login`, `/api/auth/login` y el webhook de WhatsApp (que
+   se valida por su cuenta, no con esta sesión). La sesión es una cookie
    `httpOnly` firmada con HMAC-SHA256, vence a los 30 días. No hay múltiples
    usuarios ni roles — si el negocio necesita eso a futuro, conviene migrar a
    algo como BetterAuth o Auth.js. Para producción, sumale igual TLS a nivel
    de reverse proxy — esta auth no reemplaza HTTPS.
-4. El endpoint `/api/whatsapp/webhook` valida la firma de cada request contra
-   `WHATSAPP_APP_SECRET` — no lo desactives ni lo dejes sin `App Secret`
-   configurado en producción, o cualquiera podría inyectar mensajes falsos.
+4. Validá siempre la autenticidad de los webhooks entrantes en producción
+   (firma de Twilio, o `WHATSAPP_APP_SECRET` si se usa la Cloud API de Meta)
+   — sin eso, cualquiera podría inyectar mensajes falsos.
 
 ## Deploy
 
-Ver [`DEPLOY.md`](./DEPLOY.md) para llevar `bot` y `panel` a Railway con
-Postgres y Redis administrados — necesario para tener la URL pública que
-pide el webhook de WhatsApp Cloud API.
+Ver [`DEPLOY.md`](./DEPLOY.md) para una guía de referencia (Railway con
+Postgres y Redis administrados). Escrita para la variante con WhatsApp Cloud
+API — si el deploy final usa Twilio, ajustá las variables de entorno y el
+servicio del gateway (`server.js`) según corresponda.
 
-## Mejoras pendientes (fuera de scope v1)
+## Mejoras pendientes
 
 - Soporte de mensajes de imagen y sticker (hoy se ignoran; audio ya se
   transcribe).
 - Manejo de mensajes de grupos (hoy se ignoran).
 - WebSockets en vez de polling para el panel.
+- Cancelación y reprogramación de turnos desde el bot (hoy solo lo gestiona
+  una persona del local).
