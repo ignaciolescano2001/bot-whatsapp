@@ -44,8 +44,24 @@ export async function sendOwnerNotification(
   await sendText(to, text);
 }
 
-export async function downloadMedia(_mediaId: string): Promise<Buffer> {
-  throw new TwilioApiError(
-    "downloadMedia no está implementado para Twilio todavía (los audios de Twilio llegan por MediaUrl, no por mediaId)",
-  );
+// A diferencia de la API de Meta (mediaId + Graph API), en Twilio el
+// "id" que llega en el mensaje encolado es directamente la MediaUrl del
+// webhook (ver server.js) — se descarga autenticando con Basic Auth usando
+// las mismas credenciales de la cuenta de Twilio.
+export async function downloadMedia(mediaUrl: string): Promise<Buffer> {
+  if (!ACCOUNT_SID || !AUTH_TOKEN) {
+    throw new TwilioApiError(
+      "Faltan TWILIO_ACCOUNT_SID/TWILIO_AUTH_TOKEN en las variables de entorno",
+    );
+  }
+  const auth = Buffer.from(`${ACCOUNT_SID}:${AUTH_TOKEN}`).toString("base64");
+  const res = await fetch(mediaUrl, {
+    headers: { Authorization: `Basic ${auth}` },
+  });
+  if (!res.ok) {
+    throw new TwilioApiError(
+      `No se pudo descargar el audio de Twilio (status ${res.status})`,
+    );
+  }
+  return Buffer.from(await res.arrayBuffer());
 }

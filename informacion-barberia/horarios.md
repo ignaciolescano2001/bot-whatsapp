@@ -17,6 +17,13 @@
   turno en el momento** si el horario está libre. No hay recordatorio
   automático todavía (queda para una próxima etapa).
 
+## Excepciones puntuales
+Estos horarios son los habituales, pero puede haber excepciones para una
+fecha específica: el local cerrado por feriado, un peluquero puntualmente
+ausente, o un horario especial reducido. Esos casos no están escritos acá
+porque cambian — el bot siempre los ve reflejados en el resultado real de
+`consultar_disponibilidad` para esa fecha, nunca hay que adivinarlos.
+
 ---
 *Regla para el bot: si el cliente pide un turno fuera del horario de atención
 del local, aclarar el horario real y ofrecer el horario más cercano dentro de

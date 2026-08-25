@@ -10,12 +10,15 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ turnos });
 }
 
-const SERVICIOS_VALIDOS: ServicioPedido[] = ["corte", "barba_o_rapado", "combo"];
+const SERVICIOS_VALIDOS: ServicioPedido[] = ["corte", "barba_o_rapado", "combo", "rapado_y_barba"];
 
 const MOTIVO_MENSAJE: Record<string, string> = {
   ocupado: "Justo se ocupó ese horario. Elegí otro.",
   horario_fijo: "Ese horario está reservado de forma fija.",
   fuera_de_horario: "Ese horario está fuera de la atención del local.",
+  cerrado: "Ese día la peluquería permanece cerrada.",
+  peluquero_ausente: "Ese peluquero no está disponible ese día.",
+  fuera_de_horario_especial: "Ese horario está fuera del horario especial de ese día.",
   servicios_no_encontrados: "No se encontraron los servicios en la base.",
   error: "No se pudo guardar el turno.",
 };

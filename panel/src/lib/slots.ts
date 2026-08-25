@@ -22,6 +22,23 @@ export function generateSlots(dow: number): string[] {
   return slots;
 }
 
+// Igual que generateSlots pero para un rango de horas arbitrario (usado por
+// las excepciones de "horario especial"), no atado a getHoursForDow.
+export function generateSlotsEnRango(horaInicio: string, horaFin: string): string[] {
+  const [h1, m1] = horaInicio.split(":").map(Number);
+  const [h2, m2] = horaFin.split(":").map(Number);
+  const slots: string[] = [];
+  let cur = h1 * 60 + m1;
+  const end = h2 * 60 + m2;
+  while (cur + 30 <= end) {
+    const h = Math.floor(cur / 60);
+    const m = cur % 60;
+    slots.push(`${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`);
+    cur += 30;
+  }
+  return slots;
+}
+
 export const DIAS_ABIERTOS: { value: number; label: string }[] = [
   { value: 2, label: "Martes" },
   { value: 3, label: "Miércoles" },

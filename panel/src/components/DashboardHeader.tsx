@@ -28,10 +28,22 @@ export default function DashboardHeader({ phone }: { phone: string | null }) {
           Turnos
         </Link>
         <Link
+          href="/agenda-semanal"
+          className="rounded-md border border-neutral-800 px-3 py-1.5 text-sm text-neutral-300 hover:bg-neutral-900"
+        >
+          Agenda semanal
+        </Link>
+        <Link
           href="/horarios-fijos"
           className="rounded-md border border-neutral-800 px-3 py-1.5 text-sm text-neutral-300 hover:bg-neutral-900"
         >
           Horarios fijos
+        </Link>
+        <Link
+          href="/excepciones"
+          className="rounded-md border border-neutral-800 px-3 py-1.5 text-sm text-neutral-300 hover:bg-neutral-900"
+        >
+          Excepciones
         </Link>
         <button
           onClick={handleLogout}

@@ -30,6 +30,23 @@ function generateSlots(dow: number): string[] {
   return slots;
 }
 
+// Igual que generateSlots pero para un rango de horas arbitrario (usado por
+// las excepciones de "horario especial"), no atado a getHoursForDow.
+export function generateSlotsEnRango(horaInicio: string, horaFin: string): string[] {
+  const [h1, m1] = horaInicio.split(":").map(Number);
+  const [h2, m2] = horaFin.split(":").map(Number);
+  const slots: string[] = [];
+  let cur = h1 * 60 + m1;
+  const end = h2 * 60 + m2;
+  while (cur + 30 <= end) {
+    const h = Math.floor(cur / 60);
+    const m = cur % 60;
+    slots.push(`${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`);
+    cur += 30;
+  }
+  return slots;
+}
+
 // dow según extract(dow) de Postgres: 0 = domingo ... 6 = sábado. Se calcula
 // en UTC para no depender de la zona horaria del proceso.
 function dowFromFechaIso(fechaIso: string): number {
@@ -38,7 +55,7 @@ function dowFromFechaIso(fechaIso: string): number {
 }
 
 export type PeluqueroNombre = "Ignacio" | "Chino";
-export type ServicioPedido = "corte" | "barba_o_rapado" | "combo";
+export type ServicioPedido = "corte" | "barba_o_rapado" | "combo" | "rapado_y_barba";
 
 interface Peluquero {
   id: string;
@@ -59,6 +76,54 @@ async function getPeluqueroPorNombre(nombre: string): Promise<Peluquero | null> 
   return res.rows[0] ?? null;
 }
 
+export type TipoExcepcion = "cerrado" | "peluquero_ausente" | "horario_especial";
+
+interface ExcepcionRow {
+  tipo: TipoExcepcion;
+  peluquero_id: string | null;
+  hora_inicio: string | null;
+  hora_fin: string | null;
+  motivo: string | null;
+}
+
+interface ExcepcionesResueltas {
+  cerrado: boolean;
+  motivoCierre?: string;
+  horarioEspecial?: { inicio: string; fin: string; motivo?: string };
+  peluquerosAusentes: Map<string, string | null>;
+}
+
+// Función pura: no toca la DB, solo interpreta las filas de excepciones de
+// un día. Se testea sin necesidad de una conexión real (ver
+// scripts/test-excepciones.ts).
+export function resolverExcepciones(excepciones: ExcepcionRow[]): ExcepcionesResueltas {
+  const resultado: ExcepcionesResueltas = { cerrado: false, peluquerosAusentes: new Map() };
+  for (const e of excepciones) {
+    if (e.tipo === "cerrado") {
+      resultado.cerrado = true;
+      resultado.motivoCierre = e.motivo ?? undefined;
+    } else if (e.tipo === "horario_especial" && e.hora_inicio && e.hora_fin) {
+      resultado.horarioEspecial = {
+        inicio: e.hora_inicio.slice(0, 5),
+        fin: e.hora_fin.slice(0, 5),
+        motivo: e.motivo ?? undefined,
+      };
+    } else if (e.tipo === "peluquero_ausente" && e.peluquero_id) {
+      resultado.peluquerosAusentes.set(e.peluquero_id, e.motivo ?? null);
+    }
+  }
+  return resultado;
+}
+
+async function getExcepcionesDia(fechaIso: string): Promise<ExcepcionRow[]> {
+  const res = await pool.query<ExcepcionRow>(
+    `SELECT tipo, peluquero_id, hora_inicio, hora_fin, motivo
+     FROM excepciones_agenda WHERE fecha = $1`,
+    [fechaIso],
+  );
+  return res.rows;
+}
+
 async function getServicios(): Promise<{ corte: Servicio; barbaORapado: Servicio } | null> {
   const res = await pool.query<Servicio>(
     `SELECT id, nombre, precio::float AS precio FROM servicios WHERE activo = true`,
@@ -74,6 +139,9 @@ export interface DisponibilidadResult {
   peluquero: string;
   fecha: string;
   cerrado: boolean;
+  motivo_cierre?: string;
+  peluquero_ausente?: boolean;
+  motivo_ausencia?: string;
   horarios_libres: string[];
 }
 
@@ -91,7 +159,34 @@ export async function consultarDisponibilidad(
     return { ok: true, peluquero: peluquero.nombre, fecha: fechaIso, cerrado: true, horarios_libres: [] };
   }
 
-  const todos = generateSlots(dow);
+  const excepciones = resolverExcepciones(await getExcepcionesDia(fechaIso));
+
+  if (excepciones.cerrado) {
+    return {
+      ok: true,
+      peluquero: peluquero.nombre,
+      fecha: fechaIso,
+      cerrado: true,
+      motivo_cierre: excepciones.motivoCierre,
+      horarios_libres: [],
+    };
+  }
+
+  if (excepciones.peluquerosAusentes.has(peluquero.id)) {
+    return {
+      ok: true,
+      peluquero: peluquero.nombre,
+      fecha: fechaIso,
+      cerrado: false,
+      peluquero_ausente: true,
+      motivo_ausencia: excepciones.peluquerosAusentes.get(peluquero.id) ?? undefined,
+      horarios_libres: [],
+    };
+  }
+
+  const todos = excepciones.horarioEspecial
+    ? generateSlotsEnRango(excepciones.horarioEspecial.inicio, excepciones.horarioEspecial.fin)
+    : generateSlots(dow);
 
   const [ocupadosRes, fijosRes] = await Promise.all([
     pool.query<{ hora: string }>(
@@ -136,11 +231,44 @@ export type CrearTurnoResult =
       fecha: string;
       hora: string;
     }
-  | { ok: false; motivo: "peluquero_no_encontrado" | "ocupado" | "horario_fijo" | "fuera_de_horario" | "error"; detalle?: string };
+  | {
+      ok: false;
+      motivo:
+        | "peluquero_no_encontrado"
+        | "cerrado"
+        | "peluquero_ausente"
+        | "fuera_de_horario_especial"
+        | "ocupado"
+        | "horario_fijo"
+        | "fuera_de_horario"
+        | "error";
+      detalle?: string;
+    };
 
 export async function crearTurno(input: CrearTurnoInput): Promise<CrearTurnoResult> {
   const peluquero = await getPeluqueroPorNombre(input.peluquero);
   if (!peluquero) return { ok: false, motivo: "peluquero_no_encontrado" };
+
+  const excepciones = resolverExcepciones(await getExcepcionesDia(input.fecha));
+  if (excepciones.cerrado) {
+    return { ok: false, motivo: "cerrado", detalle: excepciones.motivoCierre };
+  }
+  if (excepciones.peluquerosAusentes.has(peluquero.id)) {
+    return {
+      ok: false,
+      motivo: "peluquero_ausente",
+      detalle: excepciones.peluquerosAusentes.get(peluquero.id) ?? undefined,
+    };
+  }
+  if (excepciones.horarioEspecial) {
+    const slotsValidos = generateSlotsEnRango(
+      excepciones.horarioEspecial.inicio,
+      excepciones.horarioEspecial.fin,
+    );
+    if (!slotsValidos.includes(input.hora.slice(0, 5))) {
+      return { ok: false, motivo: "fuera_de_horario_especial" };
+    }
+  }
 
   const servicios = await getServicios();
   if (!servicios) return { ok: false, motivo: "error", detalle: "No pude leer los servicios." };
@@ -157,6 +285,14 @@ export async function crearTurno(input: CrearTurnoInput): Promise<CrearTurnoResu
     servicioId = barbaORapado.id;
     servicioLabel = "Barba o rapado";
     precio = barbaORapado.precio;
+  } else if (input.servicio === "rapado_y_barba") {
+    // Rapado y barba sí se combinan (son partes distintas: cabeza y
+    // barba), a diferencia de corte + rapado que son excluyentes. Mismo
+    // servicio_id que "barba_o_rapado" (no hay ítem propio de "rapado" en
+    // la tabla servicios), precio sumado sin descuento.
+    servicioId = barbaORapado.id;
+    servicioLabel = "Rapado + Barba";
+    precio = barbaORapado.precio * 2;
   } else {
     // "combo" es siempre corte + barba, nunca corte + rapado (rapar
     // reemplaza al corte, no tiene sentido combinarlos).

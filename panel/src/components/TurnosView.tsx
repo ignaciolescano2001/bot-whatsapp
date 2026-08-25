@@ -85,9 +85,13 @@ export default function TurnosView() {
       ? corte?.precio
       : formServicio === "barba_o_rapado"
         ? barbaORapado?.precio
-        : corte && barbaORapado
-          ? corte.precio + barbaORapado.precio
-          : undefined;
+        : formServicio === "rapado_y_barba"
+          ? barbaORapado
+            ? barbaORapado.precio * 2
+            : undefined
+          : corte && barbaORapado
+            ? corte.precio + barbaORapado.precio
+            : undefined;
 
   async function cancelar(t: Turno) {
     if (!confirm(`¿Cancelar el turno de ${t.cliente_nombre} (${t.hora.slice(0, 5)})?`)) return;
@@ -215,7 +219,8 @@ export default function TurnosView() {
             >
               <option value="corte">Corte de pelo</option>
               <option value="barba_o_rapado">Barba o rapado</option>
-              <option value="combo">Corte + barba/rapado</option>
+              <option value="combo">Corte + barba</option>
+              <option value="rapado_y_barba">Rapado + barba</option>
             </select>
             {precioServicio !== undefined && (
               <p className="mt-1 text-xs text-neutral-500">{fmtPrice(precioServicio)}</p>

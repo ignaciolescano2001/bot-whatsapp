@@ -144,12 +144,18 @@ export async function insertMessage(
   }
 }
 
+// Después de 8hs sin mensajes se considera que arranca una charla nueva:
+// no se le manda al LLM el historial de antes de ese corte, para que no
+// arrastre contexto viejo de un trámite ya cerrado.
+const HISTORY_MAX_AGE = "8 hours";
+
 export async function getRecentHistory(
   conversationId: number,
   limit = 20,
 ): Promise<Message[]> {
   const res = await pool.query<Message>(
     `SELECT * FROM messages WHERE conversation_id = $1
+     AND created_at > now() - interval '${HISTORY_MAX_AGE}'
      ORDER BY created_at DESC LIMIT $2`,
     [conversationId, limit],
   );

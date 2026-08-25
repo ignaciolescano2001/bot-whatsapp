@@ -38,9 +38,9 @@ const tools: OpenAI.Chat.ChatCompletionTool[] = [
           peluquero: { type: "string", enum: ["Ignacio", "Chino"] },
           servicio: {
             type: "string",
-            enum: ["corte", "barba_o_rapado", "combo"],
+            enum: ["corte", "barba_o_rapado", "combo", "rapado_y_barba"],
             description:
-              "corte = Corte de pelo. barba_o_rapado = Barba o rapado, sin corte (mismo precio, no combinable con corte porque el rapado reemplaza al corte). combo = corte + barba juntos (NUNCA corte + rapado).",
+              "corte = Corte de pelo. barba_o_rapado = Barba O rapado, uno solo (mismo precio). combo = corte + barba juntos. rapado_y_barba = rapado + barba juntos (SÍ se puede: son partes distintas, cabeza y barba). El rapado NUNCA se combina con el corte (uno reemplaza al otro, ambos son tratamiento de cabeza) — si piden corte + rapado, usá barba_o_rapado o combo según corresponda, nunca los combines.",
           },
           fecha: { type: "string", description: "YYYY-MM-DD" },
           hora: { type: "string", description: "HH:MM, en punto o y media" },
@@ -187,12 +187,22 @@ export async function generateReply(
 
   const effects: ReplyEffects = { notify: [], switchToHuman: false };
 
+  const params: OpenAI.Chat.ChatCompletionCreateParamsNonStreaming = {
+    model: MODEL,
+    messages,
+    tools,
+  };
+  // La familia de modelos "gpt-5" no permite combinar tool calling con
+  // razonamiento en /v1/chat/completions: hay que forzar reasoning_effort a
+  // "none" (la API lo acepta aunque el tipo del SDK todavía no lo declare).
+  // gpt-4o/gpt-4o-mini no soportan este parámetro en absoluto, así que solo
+  // se manda para modelos de esa familia.
+  if (MODEL.startsWith("gpt-5")) {
+    (params as unknown as Record<string, unknown>).reasoning_effort = "none";
+  }
+
   for (let step = 0; step < 4; step++) {
-    const completion = await client.chat.completions.create({
-      model: MODEL,
-      messages,
-      tools,
-    });
+    const completion = await client.chat.completions.create(params);
 
     const choice = completion.choices[0];
     const toolCalls = choice?.message?.tool_calls;

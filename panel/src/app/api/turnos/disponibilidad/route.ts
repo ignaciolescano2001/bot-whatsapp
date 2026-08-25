@@ -7,6 +7,6 @@ export async function GET(req: NextRequest) {
   if (!peluqueroId || !fecha) {
     return NextResponse.json({ error: "faltan peluqueroId o fecha" }, { status: 400 });
   }
-  const horarios_libres = await consultarDisponibilidad(peluqueroId, fecha);
-  return NextResponse.json({ horarios_libres });
+  const resultado = await consultarDisponibilidad(peluqueroId, fecha);
+  return NextResponse.json(resultado);
 }

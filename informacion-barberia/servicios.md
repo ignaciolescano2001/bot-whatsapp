@@ -17,9 +17,14 @@ combinarlo con un corte de pelo en la misma visita.
 es SIEMPRE corte + barba, nunca corte + rapado. Se anota como un solo
 turno de "Corte de pelo" (no como dos turnos separados).
 
+**Combo (rapado + barba en la misma visita):** $12.000 en total (rapado
+$6.000 + barba $6.000, sin descuento). A diferencia de corte + rapado,
+rapado y barba sí se pueden combinar porque son partes distintas (cabeza y
+barba). Se anota como un solo turno de "Barba o rapado".
+
 Si un cliente pide corte + rapado juntos, aclarale con buena onda que no
 tiene sentido combinarlos (uno reemplaza al otro) y preguntale si quiere
-solo el rapado, o el combo de corte + barba.
+solo el rapado, el combo de corte + barba, o el combo de rapado + barba.
 
 ## Quiénes atienden
 - **Ignacio** — especialidad en barbería y cortes clásicos.
