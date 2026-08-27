@@ -86,3 +86,22 @@ Reglas:
 - Nunca borrar volúmenes de Docker
 - Después de cada cambio, verificar con un comando y mostrarme la salida
 - Si algo falla, parar y avisar. No intentar arreglarlo por tu cuenta
+
+al diagnosticar en el servidor: siempre mostrar la linea textual del log que sostiene la conclusion, si no hay linea, decir que es una hipotesis.
+
+
+## Redeploy del servidor
+
+se corre en este orden, no saltear pasos.
+
+1.Verificar que en local no haya cambios sin commitear
+2. Push
+3. En el servidor: pull, y mostrar qué archivos cambiaron
+4. Si cambió código de bot o panel: rebuild de esos servicios
+5. Levantar de nuevo, recreando solo lo que cambió
+6. Verificar que los cuatro servicios queden sanos
+7. Verificar que la base conserva los datos
+8. Verificar que el bot sigue vinculado a WhatsApp
+9. Reportar cuánto tiempo estuvo el sistema sin responder
+
+PROHIBIDO: cualquier comando que borre volúmenes. Si creés que hace falta, parás y me preguntas.
